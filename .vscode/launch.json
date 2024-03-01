@@ -1,0 +1,11 @@
+{
+    "configurations": [
+        {
+            "runtimeExecutable": "/Users/yashas1145/applications/Brave Browser.app",
+            "type": "chrome",
+            "name": "http://localhost:3000/secrets",
+            "request": "launch",
+            "url": "http://localhost:3000/secrets"
+        }
+    ]
+}

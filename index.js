@@ -4,6 +4,8 @@ import pg from "pg";
 import { fileURLToPath } from "url";
 import session from "express-session";
 import bcrypt from "bcrypt";
+import passport from "passport";
+import { Strategy } from "passport-local";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const port = 3000;
@@ -13,11 +15,13 @@ const db = new pg.Client({user: "postgres", database: "fs-apps", host: "localhos
 
 db.connect();
 
+app.use(session({secret: 'topsecret', resave: false, saveUninitialized: true, cookie: {maxAge: 1000*60*60*24}}));
 app.use("/css", express.static(path.join(__dirname, "node_modules/bootstrap/dist/css")));
 app.use("/js", express.static(path.join(__dirname, "node_modules/bootstrap/dist/js")));
 app.use(express.static("public"));
 app.use(express.urlencoded({extended: true}));
-app.use(session({secret: 'mySecret', resave: false, saveUninitialized: false}));
+app.use(passport.initialize());
+app.use(passport.session());
 
 app.get("/", (req, res) => {
     const data = {
@@ -26,9 +30,31 @@ app.get("/", (req, res) => {
     res.render("index.ejs", data);
 });
 
+app.get("/secrets", (req, res) => {
+    if (req.isAuthenticated()) {
+        res.render("secrets.ejs");
+    } else {
+        res.redirect("/");
+    }
+});
+
+app.get("/error", (req, res) => {
+    res.render("error.ejs", {message: "Something went wrong."});
+})
+
 app.post("/user", (req, res) => {
     const user = [req.body.email, req.body.password];
-    if (addUser(user)) {
+    var userAdded = false;
+    try {
+        bcrypt.hash(user[1], saltRounds, async (err, hash) => {
+            if (err) throw err;
+            await db.query("INSERT INTO users (user_email, user_password) VALUES ($1, $2)", [user[0], hash]);
+            userAdded = true;
+        });
+    } catch (exc) {
+        console.log("Error adding user to database.");
+    }
+    if (userAdded) {
         req.session.userAdded = true;
         res.redirect("/");
     } else {
@@ -37,51 +63,45 @@ app.post("/user", (req, res) => {
     }
 });
 
-app.post("/login", async (req, res) => {
-    const email = req.body.email;
-    const password = req.body.password;
-    const user = await getUserByEmail(email);
-    if (user.length > 0) {
-        bcrypt.compare(password, user[0].user_password, (err, result) => {
-            if (err) {
-                console.log("Error comparing passwords.");
-            } else {
-                if (result) {
-                    res.render("secrets.ejs");
+app.post("/login", passport.authenticate("local", {
+    successRedirect: "/secrets",
+    failureRedirect: "/error",
+}));
+
+passport.use(new Strategy({usernameField: "email", passwordField: "password"}, async function verify(username, password, cb) {
+    try {
+        const user = (await db.query("SELECT * FROM users WHERE user_email = $1", [username])).rows;
+        console.log(user);
+        if (user.length > 0) {
+            bcrypt.compare(password, user[0].user_password, (err, result) => {
+                if (err) {
+                    console.log("Error comparing passwords -> ", err);
+                    return cb(err);
                 } else {
-                    res.render("error.ejs", {"message": "Incorrect password. User not authorized."});
+                    if (result) {
+                        return cb(null, user[0]);
+                    } else {
+                        return cb(null, false);
+                    }
                 }
-            }
-        });
-    } else {
-        console.log("User not found.");
+            });
+        } else {
+            return cb("User not found.");
+        }
+    } catch (exc) {
+        console.log("Error fetching user from database.");
     }
+}));
+
+passport.serializeUser((user, cb) => {
+    cb(null, user);
+});
+
+passport.deserializeUser(async (user, cb) => {
+    cb(null, user);
 });
 
 app.listen(port, (err) => {
     if (err) throw err;
     console.log(`Server running on port ${port}`);
 });
-
-async function addUser(user) {
-    try {
-        bcrypt.hash(user[1], saltRounds, async (err, hash) => {
-            if (err) {
-                console.log("Error in hashing password ->", err);
-            }
-            await db.query("INSERT INTO users (user_email, user_password) VALUES ($1, $2)", [user[0], hash]);
-        });
-        return true;
-    } catch (exc) {
-        console.log("Error adding user to database ->", exc);
-    }
-}
-
-async function getUserByEmail(email) {
-    try {
-        let user = await db.query("SELECT * FROM users WHERE user_email = $1", [email]);
-        return user.rows;
-    } catch (exc) {
-        console.log("User with email", email, "not found.");
-    }
-}
