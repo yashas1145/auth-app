@@ -1,0 +1,53 @@
+<%- include('partials/header.ejs') %>
+
+    <div class="container">
+        <h1>Secrets🤫</h1>
+        <% if (locals.userAdded) { %>
+            <% if (userAdded === null) { %>
+            <% } else if (userAdded) { %>
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    User added successfully.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            <% } else { %>
+                <div class="alert alert-warning alert-dismissable fade show" role="alert">
+                    Error adding user.
+                </div>
+            <% } %>
+        <% } %>
+        <div class="container login" id="login">
+            <form action="/login" method="post">
+                <div class="row">
+                    <div class="col">
+                        <input class="form-control" type="text" name="email" id="email" placeholder="Use your email to login">
+                    </div>
+                    <div class="col">
+                        <input class="form-control" type="password" name="password" id="password" placeholder="Your password goes here...">
+                    </div>
+                    <div class="col">
+                        <input class="btn btn-success" type="submit" value="Login">
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="container register" id="register" hidden>
+            <form action="/user" method="post">
+                <div class="row">
+                    <div class="col">
+                        <input class="form-control" type="text" name="email" id="email" placeholder="Register using your email">
+                    </div>
+                    <div class="col">
+                        <input class="form-control" type="password" name="password" id="password" placeholder="Enter a strong password!">
+                    </div>
+                    <div class="col">
+                        <input class="btn btn-success" type="submit" value="Register">
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="container">
+            <button class="btn btn-primary" id="register-btn" onclick="handleRegisterBtn()">Not a user? Register</button>
+        </div>
+    </div>
+
+<%- include('partials/footer.ejs') %>
