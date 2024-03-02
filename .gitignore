@@ -1,0 +1,5 @@
+#Environment varialbes
+.env
+
+#JSON files
+client_secret.json

@@ -46,7 +46,16 @@
             </form>
         </div>
         <div class="container">
-            <button class="btn btn-primary" id="register-btn" onclick="handleRegisterBtn()">Not a user? Register</button>
+            <div class="row">
+                <div class="col">
+                    <button class="btn btn-primary" id="register-btn" onclick="handleRegisterBtn()">Not a user? Register</button>
+                </div>
+                <div class="col">
+                    <form action="/auth/google">
+                        <button class="btn btn-primary" type="submit">Sign up with google</button>
+                    </form>
+                </div>
+            </div>
         </div>
     </div>
 
