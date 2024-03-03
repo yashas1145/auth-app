@@ -19,7 +19,7 @@ const db = new pg.Client({user: process.env.PG_USER, database: process.env.PG_DA
 
 db.connect();
 
-app.use(session({secret: process.env.SESSION_SECRET, resave: false, saveUninitialized: true, cookie: {maxAge: 1000*60*60*24}}));
+app.use(session({secret: process.env.SESSION_SECRET, resave: false, saveUninitialized: true}));
 app.use("/css", express.static(path.join(__dirname, "node_modules/bootstrap/dist/css")));
 app.use("/js", express.static(path.join(__dirname, "node_modules/bootstrap/dist/js")));
 app.use(express.static("public"));
@@ -34,9 +34,19 @@ app.get("/", (req, res) => {
     res.render("index.ejs", data);
 });
 
-app.get("/secrets", (req, res) => {
+app.get("/secrets", async (req, res) => {
     if (req.isAuthenticated()) {
-        res.render("secrets.ejs");
+        try {   
+            const user = await db.query("SELECT * FROM users WHERE user_email = $1", [req.user.user_email]);
+            const secret = user.rows[0].secret;
+            if (secret) {
+                res.render("secrets.ejs", {"secret": secret});
+            } else {
+                res.render("secrets.ejs", {"secret": "No secret found yet!"});
+            }
+        } catch (exc) {
+            console.log("Error fetching user and their secret.");
+        }
     } else {
         res.redirect("/");
     }
@@ -57,6 +67,14 @@ app.get("/logout", (req, res) => {
         res.redirect("/");
     });
 });
+
+app.get("/add-secret", (req, res) => {
+    if (req.isAuthenticated()) {
+        res.render("add_secret.ejs");
+    } else {
+        res.redirect("/");
+    }
+})
 
 app.get("/error", (req, res) => {
     res.render("error.ejs", {message: "Something went wrong."});
@@ -98,10 +116,23 @@ app.post("/login", passport.authenticate("local", {
     failureRedirect: "/error",
 }));
 
+app.post("/secret", async (req, res) => {
+    const secret = req.body.secret;
+    try {
+        await db.query("UPDATE users SET secret = $1 WHERE user_email = $2", [secret, req.user.user_email]);
+        res.redirect("/secrets");
+    } catch (exc) {
+        console.log("Error updating secret for user", req.user);
+    }
+})
+
 //Local auth strategy
 passport.use("local", new Strategy({usernameField: "email", passwordField: "password"}, async function verify(username, password, cb) {
     try {
         const user = (await db.query("SELECT * FROM users WHERE user_email = $1", [username])).rows;
+        if (user[0].user_password === 'google') {
+            return cb(null, user[0]);
+        }
         if (user.length > 0) {
             bcrypt.compare(password, user[0].user_password, (err, result) => {
                 if (err) {
